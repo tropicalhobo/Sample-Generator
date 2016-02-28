@@ -29,9 +29,22 @@ def pixel_counter(fn):
     data = band.ReadAsArray(0,0,
                             cols,rows)
 
-    #mask array to mask out cloud, cloud shadow and 0 values
-    mdata = ma.masked_where(data==15,data)
-    mcloud = ma.masked_inside(mdata,4,6)
+    # mask array to mask out cloud, cloud shadow and 0 values
+    ignore_pix = [4,5,6,15]
+    mask = np.in1d(data, ignore_pix).reshape(data.shape)
+    non_mask = np.where(mask == False)
+    mdata = ma.array(data,mask=mask)
+    nonmask_ind = ma.where(mdata>0)
+    rand_ind = np.choice(np.arange(nonmask_ind[0].size),500)
+
+
+    # random sampling of pixels
+    choice = 500
+
+    #random_col = np.random.choice(non_mask[0],choice)
+    #random_row = np.random.choice(non_mask[1],choice)
+    #random_pix = data[np.ix_(random_col, random_row)]
+
 
     #land class pixel count and area computation
     lclass_count = {}
@@ -53,7 +66,8 @@ def pixel_counter(fn):
     for j in lclass_area:
         class_proportion[j] = lclass_area[j]/total_cl_area*100
 
-    return mcloud
+    return nonmask_ind[0].size, nonmask_ind[1].size
+
 
 def main():
     import csv
