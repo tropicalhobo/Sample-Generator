@@ -2,7 +2,7 @@ import gdal
 from gdalconst import *
 import numpy as np
 import numpy.ma as ma
-import os
+import os, random
 
 __author__ = 'G Torres'
 
@@ -58,21 +58,17 @@ def pixel_counter(fn):
 
     # return class_proportion
 
-    # random sampling scheme of pixels
-    user_input = 500
-    ignore_pix = [2, 4,
-                  5, 6, 15]
+    # mask array to mask out cloud, cloud shadow and 0 values
+    ignore_pix = [4,5,6,15]
+    mask = np.in1d(data, ignore_pix).reshape(data.shape)  # returns boolean of ignored values
+    mdata = ma.array(data,mask=mask)  # masks the image-array
+    nonmask_ind = ma.where(mdata>0)  # returns the indices of non-masked elements
 
-    # generate 1D index arrays for columns and rows
-    cols_index = np.arange(cols)
-    rows_index = np.arange(rows)
-
-    # select random values
-    random_col = np.random.choice(cols_index, user_input)
-    random_row = np.random.choice(rows_index, user_input)
-
-    # zip thru random selection
-    pix_coord = zip(random_col, random_row)
+    # random selection of indices of non-masked elements
+    sample_size = 500
+    rand_coord = random.sample(zip(nonmask_ind[0],
+                                   nonmask_ind[1]),
+                               sample_size)
 
     # convert pixel coordinate to map coordinates TODO: avoid unwanted pixel values
     map_val = {}
@@ -82,18 +78,13 @@ def pixel_counter(fn):
     wgs84 = Proj(proj='latlong', ellps='WGS84')
     utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
 
-    for coord in pix_coord:
-        if data[coord[1], coord[0]] in ignore_pix:
-            pass
-        else:
-            x_coord = geo_trans[0]+coord[0]*pix_width  # left to right
-            y_coord = geo_trans[3]-coord[1]*pix_height  # top to bottom
+    for coord in rand_coord:
+        x_coord = geo_trans[0]+coord[0]*pix_width  # left to right
+        y_coord = geo_trans[3]-coord[1]*pix_height  # top to bottom
 
-            # convert map coordinates to geographic coordinates
-            x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
-            map_val[coord] = (x_coord, y_coord), (x_geo, y_geo), data[coord[1], coord[0]]
-            user_input -= 1
-
+        # convert map coordinates to geographic coordinates
+        x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
+        map_val[coord] = (x_coord, y_coord), (x_geo, y_geo), data[coord[0], coord[1]]
 
     return map_val
 
