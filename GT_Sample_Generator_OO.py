@@ -22,7 +22,7 @@ class RandomSample:
         ds = gdal.Open(fn, GA_ReadOnly)
         return ds
 
-    def get_dimensions(self, raster):
+    def get_parameters(self, raster):
         cols = raster.RasterXSize
         rows = raster.RasterYSize
         return cols, rows
