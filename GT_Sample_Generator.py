@@ -31,11 +31,6 @@ def pixel_counter(fn):
     data = band.ReadAsArray(0, 0,
                             cols, rows)
 
-    # mask array to mask out cloud, cloud shadow and 0 values
-    mdata = ma.masked_where(data == 15, data)
-    mcloud = ma.masked_inside(mdata, 4, 6)
-    hist = np.histogram(mcloud, bins=range(16))
-
     # land class pixel count and area computation
     lclass_count = {}
     lclass_area = {}
@@ -59,7 +54,7 @@ def pixel_counter(fn):
     # return class_proportion
 
     # mask array to mask out cloud, cloud shadow and 0 values
-    ignore_pix = [4,5,6,15]
+    ignore_pix = [4, 5, 6, 15]
     mask = np.in1d(data, ignore_pix).reshape(data.shape)  # returns boolean of ignored values
     mdata = ma.array(data,mask=mask)  # masks the image-array
     nonmask_ind = ma.where(mdata>0)  # returns the indices of non-masked elements

@@ -1,6 +1,6 @@
 __author__ = 'G Torres'
 
-import gdal, ogr
+import gdal
 from gdalconst import *
 import numpy as np
 import numpy.ma as ma
@@ -31,20 +31,15 @@ def pixel_counter(fn):
 
     # mask array to mask out cloud, cloud shadow and 0 values
     ignore_pix = [4,5,6,15]
-    mask = np.in1d(data, ignore_pix).reshape(data.shape)
-    non_mask = np.where(mask == False)
-    mdata = ma.array(data,mask=mask)
-    nonmask_ind = ma.where(mdata>0)
-    rand_ind = np.choice(np.arange(nonmask_ind[0].size),500)
+    mask = np.in1d(data, ignore_pix).reshape(data.shape)  # returns boolean of ignored values
+    mdata = ma.array(data,mask=mask)  # masks the image-array
+    nonmask_ind = ma.where(mdata>0)  # returns the indices of non-masked elements
 
-
-    # random sampling of pixels
-    choice = 500
-
-    #random_col = np.random.choice(non_mask[0],choice)
-    #random_row = np.random.choice(non_mask[1],choice)
-    #random_pix = data[np.ix_(random_col, random_row)]
-
+    # random selection of indices of non-masked elements
+    sample_size = 500
+    rand_coord = random.sample(zip(nonmask_ind[0],
+                                   nonmask_ind[1]),
+                               sample_size)
 
     #land class pixel count and area computation
     lclass_count = {}
@@ -66,18 +61,19 @@ def pixel_counter(fn):
     for j in lclass_area:
         class_proportion[j] = lclass_area[j]/total_cl_area*100
 
-    return nonmask_ind[0].size, nonmask_ind[1].size
+    return rand_coord, data
 
 
 def main():
-    import csv
+
     print os.getcwd()
 
     tst_landcover = "TST_LC.tif"
 
-    lc_raster = pixel_counter(tst_landcover)
+    random_points = pixel_counter(tst_landcover)
 
-    print lc_raster
+    for i in random_points[0]:
+        print i, random_points[1][i[0], i[1]]
 
 if __name__ == "__main__":
     main()
