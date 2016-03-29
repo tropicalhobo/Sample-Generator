@@ -52,7 +52,7 @@ class RandomSample:
                                        nonmask_ind[1]),
                                    self.sample_size)
 
-        yield rand_coord
+        return rand_coord
 
     def pix_to_map(self):
         """Converts the sample of geographic coordinates to projected map coordinates."""
@@ -69,18 +69,37 @@ class RandomSample:
         wgs84 = Proj(proj='latlong', ellps='WGS84')
         utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
 
-        for coord in self.sample:
+        for coord in sample:
             x_coord = topleft_x + coord[0]*pix_width
             y_coord = topleft_y - coord[1]*pix_height
 
-            x_geo, y_geo = transform(utmn, wgs84, x_coord, y_coord)
+            x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
 
-            map_val[coord] = (x_coord, y_coord), (x_geo, y_geo), sample[
+            map_val = (x_coord, y_coord), (x_geo, y_geo), sample[
                 coord[0], coord[1]]
 
-        yield map_val
+        return map_val
 
+    def save_to_csv(self):
+        """Saves samples to a csv file."""
+        samples = self.samples
+        import csv
 
+        with open('test_sample6.csv', 'wb') as csvfile:
+            sample_writer = csv.writer(csvfile, delimiter=',')
+            sample_writer.writerow(['Geog_x', 'Geog_y',
+                                    'Proj_x', 'Proj_y',
+                                    'Pix_Val'])
+
+            for i in samples:
+                """
+                sample_writer.writerow([self.samples[i][1][0],  # longitude
+                                       self.samples[i][1][1],  # latitude
+                                       self.samples[i][0][0],  # projected x coord
+                                       self.samples[i][0][1],  # projected y coord
+                                       self.samples[i][2]])  # pixel value
+                """
+                return i
 
 
 def main():
@@ -91,28 +110,7 @@ def main():
 
     lc = RandomSample(tst_landcover)
 
-    print lc.dim, '\n', lc.sampler()
+    print lc.dim, '\n\n', lc.sampler()
 
-    """
-    print 'Pixel Coordinates: Map Coordinates, Pixel Value'
-
-    count = 1
-    with open('test_sample6.csv', 'wb') as csvfile:
-        sample_writer = csv.writer(csvfile, delimiter=',')
-        sample_writer.writerow(['Geog_x', 'Geog_y',
-                                'Proj_x', 'Proj_y',
-                                'Pix_Val'])
-
-        for i in lc_raster:
-            sample_writer.writerow([lc_raster[i][1][0],  # longitude
-                                   lc_raster[i][1][1],  # latitude
-                                   lc_raster[i][0][0],  # projected x coord
-                                   lc_raster[i][0][1],  # projected y coord
-                                   lc_raster[i][2]])  # pixel value
-
-            print count, '.', i, ':', lc_raster[i][1], \
-                ',', lc_raster[i][0], ',', lc_raster[i][2]
-            count += 1
-    """
 if __name__ == "__main__":
     main()
