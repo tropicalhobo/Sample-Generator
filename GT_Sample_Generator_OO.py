@@ -4,113 +4,106 @@ import gdal
 from gdalconst import *
 import numpy as np
 import numpy.ma as ma
-import os
 import random
 
 
 class RandomSample:
 
     def __init__(self, f, s_size=500, i_pix=[0, 15]):
+
+        if f is None:
+            raise ValueError, "raster file does not exist"
+
         self.sample_size = s_size
         self.ignore_pix = i_pix
-        self.raster = self.open_raster(f)
-        self.dim = self.img_dimensions()
-        self.geotrans = self.img_geotransform()
-        self.proj = self.img_projection()
 
-    def open_raster(self, f):
+        self.img_parameters(f)
+
+        self.get_samples()
+        self.pix_to_map()
+
+    def img_parameters(self, f):
         gdal.AllRegister()
-        ds = gdal.Open(f, GA_ReadOnly)
-        if os.path.exists(f) == None:
-            return "File does not exist."
-        else:
-            return ds
+        self.raster = gdal.Open(f, GA_ReadOnly)
+        self.cols = self.raster.RasterXSize
+        self.rows = self.raster.RasterYSize
+        self.projection = self.raster.GetProjection()
+        self.geotrans = self.raster.GetGeoTransform()
+        self.band = self.raster.GetRasterBand(1)
 
-    def img_dimensions(self):
-        cols = self.raster.RasterXSize
-        rows = self.raster.RasterYSize
-        return cols, rows
+        return
 
-    def img_geotransform(self):
-        geotrans = self.raster.GetGeoTransform()
-        return geotrans
-
-    def img_projection(self):
-        projection = self.raster.GetProjection()
-        return projection
-
-    def sampler(self):
+    def get_samples(self):
         """Generates a random sample of coordinates within the desired map classes."""
         ignore_pixel = self.ignore_pix
-        band = self.raster.GetRasterBand(1)
-        data = band.ReadAsArray(0, 0, self.dim[0], self.dim[1])
-        mask = np.in1d(data, ignore_pixel).reshape(data.shape)  # returns boolean of ignored values
-        mdata = ma.array(data, mask=mask)  # masks the image-array
-        nonmask_ind = ma.where(mdata > 0)  # returns the indices of non-masked elements
+        self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
+        mask = np.in1d(self.data, ignore_pixel).reshape(self.data.shape)  # returns boolean of ignored values
+        masked_data = ma.array(self.data, mask=mask)  # masks the image-array
+        nonmask_ind = ma.where(masked_data > 0)  # returns the indices of non-masked elements
 
-        rand_coord = random.sample(zip(nonmask_ind[0],
+        self.rand_coord = random.sample(zip(nonmask_ind[0],
                                        nonmask_ind[1]),
                                    self.sample_size)
 
-        return rand_coord
+        return
 
     def pix_to_map(self):
-        """Converts the sample of geographic coordinates to projected map coordinates."""
-        sample = self.sampler()
+        """Converts the sample of geographic coordinates to utm projected map coordinates."""
+        coord_samples = self.rand_coord
         topleft_x = self.geotrans[0]
         topleft_y = self.geotrans[3]
         pix_width = self.geotrans[1]
         pix_height = self.geotrans[5]*-1
 
-        map_val = {}
+        self.samples = {}
 
         from pyproj import Proj, transform
 
         wgs84 = Proj(proj='latlong', ellps='WGS84')
         utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
 
-        for coord in sample:
+        for coord in coord_samples:
             x_coord = topleft_x + coord[0]*pix_width
             y_coord = topleft_y - coord[1]*pix_height
 
             x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
 
-            map_val = (x_coord, y_coord), (x_geo, y_geo), sample[
-                coord[0], coord[1]]
+            self.samples[coord] = (x_coord, y_coord), (x_geo, y_geo), self.data[coord[0], coord[1]]
 
-        return map_val
+        return
 
     def save_to_csv(self):
         """Saves samples to a csv file."""
-        samples = self.samples
         import csv
 
         with open('test_sample6.csv', 'wb') as csvfile:
             sample_writer = csv.writer(csvfile, delimiter=',')
-            sample_writer.writerow(['Geog_x', 'Geog_y',
-                                    'Proj_x', 'Proj_y',
-                                    'Pix_Val'])
+            sample_writer.writerow(['id', 'geog_x', 'geog_y',
+                                    'proj_x', 'proj_y',
+                                    'pix_val'])
 
-            for i in samples:
-                """
-                sample_writer.writerow([self.samples[i][1][0],  # longitude
+            sample_id = 1
+            for i in self.samples:
+
+                sample_writer.writerow([sample_id,  # id number
+                                       self.samples[i][1][0],  # longitude
                                        self.samples[i][1][1],  # latitude
                                        self.samples[i][0][0],  # projected x coord
                                        self.samples[i][0][1],  # projected y coord
                                        self.samples[i][2]])  # pixel value
-                """
-                return i
 
+                sample_id += 1
+
+class StratSample(RandomSample):
+    pass
 
 def main():
-    #import csv
-    #print os.getcwd()
 
-    tst_landcover = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
+    test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
 
-    lc = RandomSample(tst_landcover)
+    lc = RandomSample(test_lc)
 
-    print lc.dim, '\n\n', lc.sampler()
+    lc.save_to_csv()
 
 if __name__ == "__main__":
     main()
