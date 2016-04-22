@@ -5,15 +5,17 @@ from gdalconst import *
 import numpy as np
 import numpy.ma as ma
 import random
+import os
 
 
 class RandomSample:
 
     def __init__(self, f, s_size=500, i_pix=[0, 15]):
 
-        if f is None:
-            raise ValueError, "raster file does not exist"
+        if os.path.exists(f) is False:
+            raise ValueError, "file does not exist"
 
+        self.file_name = f
         self.sample_size = s_size
         self.ignore_pix = i_pix
 
@@ -72,11 +74,22 @@ class RandomSample:
 
         return
 
+    def new_csv(self):
+        """Creates a new csv file with current date and time as suffix"""
+        import time
+        bn = os.path.basename(self.file_name)
+        t = time.localtime()
+        time_stamp = str(t[0]) + str(t[1]) + str(t[2]) + str(t[3]) \
+              + str(t[4]) + str(t[5]) + str(t[6])
+        new = time_stamp + "_" + bn + "_random_samples" + ".csv"
+
+        return new
+
     def save_to_csv(self):
         """Saves samples to a csv file."""
         import csv
 
-        with open('test_sample6.csv', 'wb') as csvfile:
+        with open(self.new_csv(), 'wb') as csvfile:
             sample_writer = csv.writer(csvfile, delimiter=',')
             sample_writer.writerow(['id', 'geog_x', 'geog_y',
                                     'proj_x', 'proj_y',
@@ -95,7 +108,20 @@ class RandomSample:
                 sample_id += 1
 
 class StratSample(RandomSample):
-    pass
+
+    def __init__(self, f):
+        RandomSample.__init__(self, f, s_size=500, i_pix=[0, 15])
+
+    def new_csv(self):
+        """Creates a new csv file with current date and time as suffix"""
+        import time
+        bn = os.path.basename(self.file_name)
+        t = time.localtime()
+        time_stamp = str(t[0]) + str(t[1]) + str(t[2]) + str(t[3]) \
+                     + str(t[4]) + str(t[5]) + str(t[6])
+        new = time_stamp + "_" + bn + "_strat_samples" + ".csv"
+
+        return new
 
 def main():
 
@@ -104,6 +130,10 @@ def main():
     lc = RandomSample(test_lc)
 
     lc.save_to_csv()
+
+    lc2 = StratSample(test_lc)
+
+    lc2.save_to_csv()
 
 if __name__ == "__main__":
     main()
