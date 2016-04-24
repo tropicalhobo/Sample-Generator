@@ -21,8 +21,8 @@ class RandomSample:
 
         self.img_parameters(f)
 
-        self.get_samples()
-        self.pix_to_map()
+        #self.get_samples()
+        #self.pix_to_map()
 
     def img_parameters(self, f):
         gdal.AllRegister()
@@ -107,10 +107,42 @@ class RandomSample:
 
                 sample_id += 1
 
+
 class StratSample(RandomSample):
 
-    def __init__(self, f):
-        RandomSample.__init__(self, f, s_size=500, i_pix=[0, 15])
+    def __init__(self, f, i_pix=[1, 15], prop=10):
+        RandomSample.__init__(self, f, i_pix)
+
+        if prop <= 100:
+            pass
+        else:
+            raise ValueError, "proportion must be <= 100"
+
+        self.class_proportion = prop
+
+    def stratify_samples(self):
+        band_hist = self.band.GetHistogram()
+        band_max = self.band.GetMaximum()
+        band_min = self.band.GetMinimum()
+        #stat = self.band.GetStatistics(0, 0)
+
+        class_prop = {}
+        self.strat_samples = {}
+
+        for pix_val in range(int(band_min), int(band_max)):
+            if pix_val in self.ignore_pix:
+                pass
+            else:
+                class_prop[pix_val] = band_hist[pix_val], int((band_hist[pix_val]*
+                                                              self.class_proportion)/100)
+                self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
+                pix_class = np.in1d(self.data, pix_val).reshape(self.data.shape)
+                pix_loc = np.where(pix_class)
+                pix_coord = random.sample(zip(pix_loc[0], pix_loc[1]),
+                                          class_prop[pix_val][1])
+                self.strat_samples[pix_val] = pix_coord
+
+        return self.strat_samples
 
     def new_csv(self):
         """Creates a new csv file with current date and time as suffix"""
@@ -123,17 +155,43 @@ class StratSample(RandomSample):
 
         return new
 
+    def save_to_csv(self):
+        """Saves samples to a csv file."""
+        import csv
+
+        with open(self.new_csv(), 'wb') as csvfile:
+            sample_writer = csv.writer(csvfile, delimiter=',')
+            sample_writer.writerow(['id', 'geog_x', 'geog_y',
+                                    'proj_x', 'proj_y',
+                                    'pix_val'])
+
+            sample_id = 1
+            for i in self.strat_samples:
+                sample_writer.writerow([sample_id,  # id number
+                                        self.strat_samples[i][1][0],  # longitude
+                                        self.strat_samples[i][1][1],  # latitude
+                                        self.strat_samples[i][0][0],  # projected x coord
+                                        self.strat_samples[i][0][1],  # projected y coord
+                                        self.strat_samples[i][2]])  # pixel value
+
+                sample_id += 1
+
+
 def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
 
-    lc = RandomSample(test_lc)
+    #lc = RandomSample(test_lc)
 
-    lc.save_to_csv()
+    #lc.save_to_csv()
 
     lc2 = StratSample(test_lc)
 
-    lc2.save_to_csv()
+    class_prop = lc2.stratify_samples()
+
+    for i in class_prop:
+        print i, class_prop[i]
+
 
 if __name__ == "__main__":
     main()
