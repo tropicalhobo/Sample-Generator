@@ -21,8 +21,11 @@ class RandomSample:
 
         self.img_parameters(f)
 
-        #self.get_samples()
-        #self.pix_to_map()
+        # collect coordinates of random samples
+        self.get_samples()
+
+        # convert pixel coordinates to map coordinates
+        self.pix_to_map()
 
     def img_parameters(self, f):
         gdal.AllRegister()
@@ -55,7 +58,7 @@ class RandomSample:
         topleft_x = self.geotrans[0]
         topleft_y = self.geotrans[3]
         pix_width = self.geotrans[1]
-        pix_height = self.geotrans[5]*-1
+        pix_height = self.geotrans[5]
 
         self.samples = {}
 
@@ -65,8 +68,8 @@ class RandomSample:
         utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
 
         for coord in coord_samples:
-            x_coord = topleft_x + coord[0]*pix_width
-            y_coord = topleft_y - coord[1]*pix_height
+            x_coord = topleft_x + coord[1]*pix_width
+            y_coord = topleft_y + coord[0]*pix_height
 
             x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
 
@@ -110,8 +113,8 @@ class RandomSample:
 
 class StratSample(RandomSample):
 
-    def __init__(self, f, i_pix=[1, 15], prop=10):
-        RandomSample.__init__(self, f, i_pix)
+    def __init__(self, f, i_pix=[1, 15], prop=5):
+        #RandomSample.__init__(self, f, i_pix)
 
         if prop <= 100:
             pass
@@ -119,6 +122,9 @@ class StratSample(RandomSample):
             raise ValueError, "proportion must be <= 100"
 
         self.class_proportion = prop
+        self.file_name = f
+        self.ignore_pix = i_pix
+        self.img_parameters(f)
 
     def stratify_samples(self):
         band_hist = self.band.GetHistogram()
@@ -127,20 +133,45 @@ class StratSample(RandomSample):
         #stat = self.band.GetStatistics(0, 0)
 
         class_prop = {}
-        self.strat_samples = {}
+        self.rand_coord = {}
 
         for pix_val in range(int(band_min), int(band_max)):
             if pix_val in self.ignore_pix:
                 pass
             else:
-                class_prop[pix_val] = band_hist[pix_val], int((band_hist[pix_val]*
-                                                              self.class_proportion)/100)
+                class_prop[pix_val] = int((band_hist[pix_val]*self.class_proportion)/100)
                 self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
                 pix_class = np.in1d(self.data, pix_val).reshape(self.data.shape)
                 pix_loc = np.where(pix_class)
                 pix_coord = random.sample(zip(pix_loc[0], pix_loc[1]),
-                                          class_prop[pix_val][1])
-                self.strat_samples[pix_val] = pix_coord
+                                          class_prop[pix_val])
+                self.rand_coord[pix_val] = pix_coord
+
+        return
+
+    def pix_to_map(self):
+        """Converts the sample of geographic coordinates to utm projected map coordinates."""
+
+        topleft_x = self.geotrans[0]
+        topleft_y = self.geotrans[3]
+        pix_width = self.geotrans[1]
+        pix_height = self.geotrans[5]
+
+        self.strat_samples = {}
+
+        from pyproj import Proj, transform
+
+        wgs84 = Proj(proj='latlong', ellps='WGS84')
+        utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
+
+        for strata in self.rand_coord:
+            for coord in self.rand_coord[strata]:
+                x_coord = topleft_x + coord[1] * pix_width
+                y_coord = topleft_y + coord[0] * pix_height
+
+                x_geo, y_geo = transform(utm51n, wgs84, x_coord, y_coord)
+
+                self.strat_samples[coord] = (x_coord, y_coord), (x_geo, y_geo), self.data[coord[0], coord[1]]
 
         return self.strat_samples
 
@@ -181,16 +212,17 @@ def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
 
-    #lc = RandomSample(test_lc)
+    lc = RandomSample(test_lc)
 
-    #lc.save_to_csv()
+    lc.save_to_csv()
 
-    lc2 = StratSample(test_lc)
+    lc2 = StratSample(test_lc, i_pix=[1,15], prop=1)
 
-    class_prop = lc2.stratify_samples()
+    lc2.stratify_samples()
 
-    for i in class_prop:
-        print i, class_prop[i]
+    lc2.pix_to_map()
+
+    lc2.save_to_csv()
 
 
 if __name__ == "__main__":
