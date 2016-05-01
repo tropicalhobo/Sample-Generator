@@ -43,10 +43,11 @@ class RandomSample:
         import ogr
 
         b_dist = self.buffer_dist
-        driver = ogr.GetDriverByName('ESRI Shapefile')
-        road_ds = driver.Open(self.roads, 0)
-        lyr = road_ds.GetLayer(0)
-        road_feat = lyr.GetFeature(0)
+        road_ds = ogr.Open(self.roads, 0)
+        drv = road_ds.GetDriver()
+        road_lyr = road_ds.GetLayer(0)
+
+        road_feat = road_lyr.GetFeature(0)
         road_geom = road_feat.GetGeometryRef()
         # TODO: implement geometry type check. abort operation if type not line
         road_buff = road_geom.Buffer(b_dist)  # buffer road feature
@@ -159,10 +160,10 @@ class StratSample(RandomSample):
         self.file_name = f
         self.ignore_pix = i_pix
         self.img_parameters(f)
-        #self.stratify_samples()  # perform stratified sampling
+        #self.get_samples()  # perform stratified sampling
         #self.pix_to_map()  # convert pixel coordinates to map coordinates
 
-    def stratify_samples(self):
+    def get_samples(self):
         """Collect random coordinates within classes according to user-specified
         proportion."""
         band_hist = self.band.GetHistogram()
