@@ -6,29 +6,41 @@ import numpy as np
 import numpy.ma as ma
 import random
 import os
+import sys
 from subprocess import call
 
 
 class RandomSample:
 
-    def __init__(self, f, s_size=500, i_pix=[0, 15], r_path = None, buff_dist = 10):
+    def __init__(self, f, s_size=500, i_pix=[0, 15], r_path=None, buff_dist=10):
 
         if os.path.exists(f) is False:
             raise ValueError, "file does not exist"
+
+        # collect image parameters
+        self.img_parameters(f)
+
+        # check if raster image is a land cover classification image
+        lc_image = self.img_check()
+        if lc_image:
+            pass
+        else:
+            print "raster is not a land cover classification image!"
+            sys.exit(1)
+
         self.roads = r_path
         self.buffer_dist = buff_dist
         self.file_name = f
         self.sample_size = s_size
         self.ignore_pix = i_pix
 
-        # collect image parameters
-        self.img_parameters(f)
-
-        # collect coordinates of random samples
-        #self.get_samples()
-
-        # convert pixel coordinates to map coordinates
-        #self.pix_to_map()
+    def img_check(self):
+        """Checks if raster image is land classification image"""
+        class_cat = self.band.GetCategoryNames()
+        if class_cat is None:
+            return False
+        else:
+            return True
 
     def metadata(self):
         class_cat = self.band.GetCategoryNames()
@@ -37,7 +49,7 @@ class RandomSample:
         pal_name = gdal.GetPaletteInterpretationName(color_int)
         color_tab = self.band.GetColorTable()
 
-        return color_ent
+        return color_cat
 
     def buffer_road(self):
         import ogr
@@ -45,15 +57,15 @@ class RandomSample:
         b_dist = self.buffer_dist
         road_ds = ogr.Open(self.roads, 0)
         drv = road_ds.GetDriver()
-        road_lyr = road_ds.GetLayer(0)
 
+        road_lyr = road_ds.GetLayer(0)
+        n_fields = road_lyr.GetLayerDefn().GetFieldCount()
         road_feat = road_lyr.GetFeature(0)
         road_geom = road_feat.GetGeometryRef()
         # TODO: implement geometry type check. abort operation if type not line
         road_buff = road_geom.Buffer(b_dist)  # buffer road feature
 
-        return road_buff
-
+        return n_fields
 
     def clip_dataset(self):
         pass
@@ -149,19 +161,12 @@ class RandomSample:
 class StratSample(RandomSample):
 
     def __init__(self, f, i_pix=[0, 15], prop=5):
-        #RandomSample.__init__(self, f, i_pix)
+        RandomSample.__init__(self, f, i_pix)
 
         if prop <= 100:
             pass
         else:
             raise ValueError, "proportion must be <= 100"
-
-        self.class_proportion = prop
-        self.file_name = f
-        self.ignore_pix = i_pix
-        self.img_parameters(f)
-        #self.get_samples()  # perform stratified sampling
-        #self.pix_to_map()  # convert pixel coordinates to map coordinates
 
     def get_samples(self):
         """Collect random coordinates within classes according to user-specified
@@ -191,7 +196,8 @@ class StratSample(RandomSample):
         return
 
     def pix_to_map(self):
-        """Converts the sample of geographic coordinates to utm projected map coordinates."""
+        """Converts the sample of geographic coordinates to utm
+        projected map coordinates."""
 
         topleft_x = self.geotrans[0]
         topleft_y = self.geotrans[3]
@@ -253,7 +259,7 @@ def main():
     road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_roads.shp"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=10)
-    strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
+    #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
 
     print random_sample.buffer_road()
 
