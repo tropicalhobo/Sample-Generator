@@ -60,23 +60,27 @@ class RandomSample:
         b_dist = self.buffer_dist
         road_ds = ogr.Open(self.roads, 0)
         drv = road_ds.GetDriver()
-
         road_lyr = road_ds.GetLayer(0)
+
+        # geometry checker
+        road_chk = road_lyr.GetFeature(0)
+        geom_chk = road_chk.GetGeometryRef()
+        type_chk = geom_chk.GetGeometryName()
+        if 'LINESTRING' in type_chk:
+            pass
+        elif 'MULTILINESTRING' in type_chk:
+            pass
+        else:
+            print '\nshapefile geometry is neither LINESTRING or MULTILINESTRING! aborting operation...'
+            sys.exit(1)
+
+        # loop through all features and buffer
         road_count = road_lyr.GetFeatureCount()
         print 'There are %d features in the shp file' % road_count
-        # loop through all features and buffer
         for i in range(road_count):
             road = road_lyr.GetFeature(i)
             road_geom = road.GetGeometryRef()
-            geom_type = road_geom.GetGeometryName()
-            if 'LINESTRING' in geom_type:  # checks if
-                print geom_type
-            elif 'MULTILINESTRING' in geom_type:
-                print geom_type
-            else:
-                print '\nshapefile not a linestring!'
-        # TODO: implement geometry type check. abort operation if type not line
-            #road_buff = road_geom.Buffer(b_dist)  # buffer road feature
+            road_buff = road_geom.Buffer(b_dist)  # buffer road feature
 
         return
 
