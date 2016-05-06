@@ -62,16 +62,19 @@ class RandomSample:
         drv = road_ds.GetDriver()
 
         road_lyr = road_ds.GetLayer(0)
+        road_count = road_lyr.GetFeatureCount()
+        print 'There are %d features in the shp file' % road_count
         # loop through all features and buffer
-        for i in range(road_lyr.GetFeatureCount()):
+        for i in range(road_count):
             road = road_lyr.GetFeature(i)
             road_geom = road.GetGeometryRef()
             geom_type = road_geom.GetGeometryName()
-            if geom_type != 'LINESTRING' or geom_type != 'MULTILINESTRING':  # checks if
-                print '\nshapefile is not linestring!'
-
-                sys.exit(1)
-            #print geom_type
+            if 'LINESTRING' in geom_type:  # checks if
+                print geom_type
+            elif 'MULTILINESTRING' in geom_type:
+                print geom_type
+            else:
+                print '\nshapefile not a linestring!'
         # TODO: implement geometry type check. abort operation if type not line
             #road_buff = road_geom.Buffer(b_dist)  # buffer road feature
 
@@ -268,7 +271,7 @@ class StratSample(RandomSample):
 def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
-    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan.shp"
+    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_roads.shp"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=10)
     #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
