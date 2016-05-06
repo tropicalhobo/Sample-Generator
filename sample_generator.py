@@ -42,14 +42,17 @@ class RandomSample:
         else:
             return True
 
-    def metadata(self):
-        class_cat = self.band.GetCategoryNames()
-        color_int = self.band.GetColorInterpretation()
-        color_ent = gdal.GetColorInterpretationName(color_int)
-        pal_name = gdal.GetPaletteInterpretationName(color_int)
-        color_tab = self.band.GetColorTable()
-
-        return color_cat
+    def __str__(self):
+        num_cat = len(self.band.GetCategoryNames())
+        histogram = self.band.GetHistogram()
+        sampling_pixels = 0
+        for i in range(num_cat):
+            sampling_pixels += histogram[i]
+        #color_int = self.band.GetColorInterpretation()
+        #color_ent = gdal.GetColorInterpretationName(color_int)
+        #pal_name = gdal.GetPaletteInterpretationName(color_int)
+        #color_tab = self.band.GetColorTable()
+        return '\nclassification image has %d classes with a total of %d pixels' % (num_cat, sampling_pixels)
 
     def buffer_road(self):
         import ogr
@@ -59,18 +62,27 @@ class RandomSample:
         drv = road_ds.GetDriver()
 
         road_lyr = road_ds.GetLayer(0)
-        n_fields = road_lyr.GetLayerDefn().GetFieldCount()
-        road_feat = road_lyr.GetFeature(0)
-        road_geom = road_feat.GetGeometryRef()
-        # TODO: implement geometry type check. abort operation if type not line
-        road_buff = road_geom.Buffer(b_dist)  # buffer road feature
+        # loop through all features and buffer
+        for i in range(road_lyr.GetFeatureCount()):
+            road = road_lyr.GetFeature(i)
+            road_geom = road.GetGeometryRef()
+            geom_type = road_geom.GetGeometryName()
+            if geom_type != 'LINESTRING' or geom_type != 'MULTILINESTRING':  # checks if
+                print '\nshapefile is not linestring!'
 
-        return n_fields
+                sys.exit(1)
+            #print geom_type
+        # TODO: implement geometry type check. abort operation if type not line
+            #road_buff = road_geom.Buffer(b_dist)  # buffer road feature
+
+        return
 
     def clip_dataset(self):
         pass
 
     def img_parameters(self, f):
+        """Load image as GDAL object and retrieve image parameters.
+        Returns gdal image object and parameters"""
         gdal.AllRegister()
         self.raster = gdal.Open(f, GA_ReadOnly)
         self.cols = self.raster.RasterXSize
@@ -256,11 +268,12 @@ class StratSample(RandomSample):
 def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
-    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_roads.shp"
+    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan.shp"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=10)
     #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
 
+    print random_sample
     print random_sample.buffer_road()
 
 
