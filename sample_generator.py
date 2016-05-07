@@ -61,6 +61,18 @@ class RandomSample:
         road_ds = ogr.Open(self.roads, 0)
         drv = road_ds.GetDriver()
         road_lyr = road_ds.GetLayer(0)
+        road_sr = road_lyr.GetSpatialRef()
+
+        # create new vector data-set
+        buff_ds = drv.CreateDataSource('road_buffer.shp')
+        buff_lyr = buff_ds.CreateLayer('buffer', geom_type=ogr.wkbMultiPolygon)
+
+        if os.path.exists('road_buffer.shp'):
+            drv.DeleteDataSource('road_buffer.shp')
+
+        # create .prj file for buffer data-set
+        with open('road_buffer.prj', 'w') as f:
+            f.write(road_sr.ExportToWkt())
 
         # geometry checker
         road_chk = road_lyr.GetFeature(0)
@@ -74,14 +86,28 @@ class RandomSample:
             print '\nshapefile geometry is neither LINESTRING or MULTILINESTRING! aborting operation...'
             sys.exit(1)
 
+        # use geometry checker field definitions
+        field_defn = road_chk.GetFieldDefnRef(0)
+        buff_lyr.CreateField(field_defn)
+        buff_defn = buff_lyr.GetLayerDefn()
+
         # loop through all features and buffer
         road_count = road_lyr.GetFeatureCount()
-        print 'There are %d features in the shp file' % road_count
+        print '\nthere are %d features in the shp file' % road_count
+        print '\nbuffering...'
         for i in range(road_count):
             road = road_lyr.GetFeature(i)
             road_geom = road.GetGeometryRef()
-            road_buff = road_geom.Buffer(b_dist)  # buffer road feature
+            buff_feat = ogr.Feature(buff_defn)
+            buff_feat.SetGeometry(road_geom.Buffer(b_dist))
+            buff_feat.SetField('osm_id', road.GetField('osm_id'))
+            buff_lyr.CreateFeature(buff_feat)
 
+            road.Destroy()
+            buff_feat.Destroy()
+        print'\ndone buffering, destroying features and datasets...'
+        road_ds.Destroy()
+        buff_ds.Destroy()
         return
 
     def clip_dataset(self):
@@ -275,13 +301,13 @@ class StratSample(RandomSample):
 def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
-    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_roads.shp"
+    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_road.shp"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=10)
     #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
 
     print random_sample
-    print random_sample.buffer_road()
+    random_sample.buffer_road()
 
 
 if __name__ == "__main__":
