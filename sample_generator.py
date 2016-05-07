@@ -21,12 +21,12 @@ class RandomSample:
         self.img_parameters(f)
 
         # check if raster image is a land cover classification image
-        lc_image = self.img_check()
-        if lc_image:
-            pass
-        else:
-            print "raster is not a land cover classification image!"
-            sys.exit(1)
+        #lc_image = self.img_check()
+        #if lc_image:
+         #   pass
+        #else:
+         #   print "\nraster is not a land cover classification image!"
+          #  sys.exit(1)
 
         self.roads = r_path
         self.buffer_dist = buff_dist
@@ -116,7 +116,8 @@ class RandomSample:
         print '\nclipping ' + name
         clipped = path + '\clip_' + name.split('.')[0] + '.TIFF'
         clip_cmd = ['gdalwarp', '-srcnodata', '-99', '-cutline', shp,
-                    '-crop_to_cutline', fn, clipped]
+                    '-crop_to_cutline', '-setci', '-overwrite', '-multi',
+                    fn, clipped]
         call(clip_cmd)
 
     def img_parameters(self, f):
@@ -176,7 +177,7 @@ class RandomSample:
         """Creates a new csv file with current date and time as suffix.
         Returns string."""
         import time
-        bn = os.path.basename(self.file_name)
+        bn = os.path.basename(self.file_name).split('.')[0]
         t = time.localtime()
         time_stamp = str(t[0]) + str(t[1]) + str(t[2]) + str(t[3]) \
               + str(t[4]) + str(t[5]) + str(t[6])
@@ -187,8 +188,9 @@ class RandomSample:
     def save_to_csv(self):
         """Saves samples to a csv file."""
         import csv
+        new_name = self.new_csv()
 
-        with open(self.new_csv, 'wb') as csvfile:
+        with open(new_name, 'wb') as csvfile:
             sample_writer = csv.writer(csvfile, delimiter=',')
             sample_writer.writerow(['id', 'geog_x', 'geog_y',
                                     'proj_x', 'proj_y',
@@ -285,9 +287,9 @@ class StratSample(RandomSample):
     def save_to_csv(self):
         """Saves samples to a csv file."""
         import csv
-
-        with open(self.new_csv(), 'wb') as csvfile:
-            sample_writer = csv.writer(csvfile, delimiter=',')
+        new_name = self.new_csv()
+        with open(new_name, 'wb') as f:
+            sample_writer = csv.writer(f, delimiter=',')
             sample_writer.writerow(['id', 'geog_x', 'geog_y',
                                     'proj_x', 'proj_y',
                                     'pix_val'])
@@ -307,15 +309,20 @@ class StratSample(RandomSample):
 def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
+    buffered_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\clip_test_lc.TIFF"
     road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_road.shp"
     road_buffer = "C:\Users\G Torres\Desktop\GmE205FinalProject\GmE205FinalProject"
 
-    random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
+    #random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
     #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
 
-    print random_sample
-    random_sample.buffer_road()
-    random_sample.clip_dataset(test_lc, road_buffer)
+    #print random_sample
+    #random_sample.buffer_road()
+    #random_sample.clip_dataset(test_lc, road_buffer)
+    bstrat_sample = StratSample(buffered_lc, prop=10)
+    bstrat_sample.get_samples()
+    bstrat_sample.pix_to_map()
+    bstrat_sample.save_to_csv()
 
 
 if __name__ == "__main__":
