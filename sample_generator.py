@@ -12,7 +12,7 @@ from subprocess import call
 
 class RandomSample:
 
-    def __init__(self, f, s_size=500, i_pix=[0, 15], r_path=None, buff_dist=10):
+    def __init__(self, f, s_size=500, i_pix=[0, 15], r_path=None, buff_dist=30):
 
         if os.path.exists(f) is False:
             raise ValueError, "file does not exist"
@@ -108,10 +108,16 @@ class RandomSample:
         print'\ndone buffering, destroying features and datasets...'
         road_ds.Destroy()
         buff_ds.Destroy()
+
         return
 
-    def clip_dataset(self):
-        pass
+    def clip_dataset(self, fn, shp):
+        path, name = os.path.split(fn)
+        print '\nclipping ' + name
+        clipped = path + '\clip_' + name.split('.')[0] + '.TIFF'
+        clip_cmd = ['gdalwarp', '-srcnodata', '-99', '-cutline', shp,
+                    '-crop_to_cutline', fn, clipped]
+        call(clip_cmd)
 
     def img_parameters(self, f):
         """Load image as GDAL object and retrieve image parameters.
@@ -302,12 +308,14 @@ def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
     road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_road.shp"
+    road_buffer = "C:\Users\G Torres\Desktop\GmE205FinalProject\GmE205FinalProject"
 
-    random_sample = RandomSample(test_lc, r_path=road, buff_dist=10)
+    random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
     #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
 
     print random_sample
     random_sample.buffer_road()
+    random_sample.clip_dataset(test_lc, road_buffer)
 
 
 if __name__ == "__main__":
