@@ -214,7 +214,7 @@ class RandomSample:
 
 class StratSample(RandomSample):
 
-    def __init__(self, f, s_size=500, i_pix=[1,15], r_path=None, buff_dist=30, prop=5):
+    def __init__(self, f, s_size=None, i_pix=[1,15], r_path=None, buff_dist=30, prop=5):
         RandomSample.__init__(self, f, s_size, i_pix, r_path, buff_dist)
 
         if prop <= 100:
@@ -232,7 +232,8 @@ class StratSample(RandomSample):
         band_min = self.band.GetMinimum()
         #stat = self.band.GetStatistics(0, 0)
 
-        class_prop = {}
+        perc_prop = {}
+        abs_prop = self.sample_size
         self.rand_coord = {}
 
         print "\ncollecting random stratified samples..."
@@ -241,13 +242,19 @@ class StratSample(RandomSample):
             if pix_val in self.ignore_pix:
                 pass
             else:
-                class_prop[pix_val] = int((band_hist[pix_val]*  # compute class proportion for sampling
-                                           self.class_proportion)/100)
+                # sample according to absolute or percentage proportion
+                if abs_prop is None:
+                    perc_prop[pix_val] = int((band_hist[pix_val]*  # compute class proportion for sampling
+                                               self.class_proportion)/100)
+                    #print '\nusing percentage proportion. %d percent per class total...' % perc_prop[pix_val]
+                    prop = perc_prop
+                else:
+                    #print '\nusing absolute proportion of %d pixels per class...' % abs_prop
+                    prop = abs_prop
                 self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
                 pix_class = np.in1d(self.data, pix_val).reshape(self.data.shape)  # select pixels from image array
                 pix_loc = np.where(pix_class)  # collect the pixel coordinates of current pixel value
-                pix_coord = random.sample(zip(pix_loc[0], pix_loc[1]),  # collect pixel coordinates randomly using
-                                          class_prop[pix_val])          # class proportion
+                pix_coord = random.sample(zip(pix_loc[0], pix_loc[1]), prop)  # class proportion
                 self.rand_coord[pix_val] = pix_coord
 
         return
@@ -319,12 +326,17 @@ def main():
     road_buffer = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
-    strat_sample = StratSample(test_lc, r_path=road, buff_dist=50, prop=1)
+    strat_sample = StratSample(test_lc,s_size=50, r_path=road, buff_dist=50, prop=1)
 
+    strat_sample.buffer_road()
+    strat_sample.clip_dataset()
     strat_sample.get_samples()
     strat_sample.pix_to_map()
-    strat_sample.save_to_csv()
+    #strat_sample.save_to_csv()
 
+    #random_sample.get_samples()
+    #random_sample.pix_to_map()
+    #random_sample.save_to_csv()
 
 if __name__ == "__main__":
     main()
