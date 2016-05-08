@@ -119,6 +119,8 @@ class RandomSample:
                     fn, clipped]
         call(clip_cmd)
 
+        return
+
     def img_parameters(self, f):
         """Load image as GDAL object and retrieve image parameters.
         Returns gdal image object and parameters"""
@@ -246,10 +248,12 @@ class StratSample(RandomSample):
                 if abs_prop is None:
                     perc_prop[pix_val] = int((band_hist[pix_val]*  # compute class proportion for sampling
                                                self.class_proportion)/100)
-                    #print '\nusing percentage proportion. %d percent per class total...' % perc_prop[pix_val]
-                    prop = perc_prop
+                    print '\nusing percentage proportion. %d sample pixels collected with pixel value %d...' % \
+                          (perc_prop[pix_val], pix_val)
+                    prop = perc_prop[pix_val]
                 else:
-                    #print '\nusing absolute proportion of %d pixels per class...' % abs_prop
+                    print '\nusing absolute proportion. %d sample pixels collected with pixel value %d...' % \
+                          (abs_prop, pix_val)
                     prop = abs_prop
                 self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
                 pix_class = np.in1d(self.data, pix_val).reshape(self.data.shape)  # select pixels from image array
@@ -326,10 +330,10 @@ def main():
     road_buffer = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject"
 
     random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
-    strat_sample = StratSample(test_lc,s_size=50, r_path=road, buff_dist=50, prop=1)
+    strat_sample = StratSample(test_lc, i_pix=[0,2,3,15], r_path=road, buff_dist=50, prop=10)
 
-    strat_sample.buffer_road()
-    strat_sample.clip_dataset()
+    #strat_sample.buffer_road()
+    #strat_sample.clip_dataset(test_lc, road_buffer)
     strat_sample.get_samples()
     strat_sample.pix_to_map()
     #strat_sample.save_to_csv()
