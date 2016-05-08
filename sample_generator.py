@@ -21,17 +21,17 @@ class RandomSample:
         self.img_parameters(f)
 
         # check if raster image is a land cover classification image
-        #lc_image = self.img_check()
-        #if lc_image:
-         #   pass
-        #else:
-         #   print "\nraster is not a land cover classification image!"
-          #  sys.exit(1)
+        lc_image = self.img_check()
+        if lc_image:
+            pass
+        else:
+            print "\nraster is not a land cover classification image!"
+            sys.exit(1)
 
-        self.roads = r_path
-        self.buffer_dist = buff_dist
         self.file_name = f
         self.sample_size = s_size
+        self.roads = r_path
+        self.buffer_dist = buff_dist
         self.ignore_pix = i_pix
 
     def img_check(self):
@@ -56,7 +56,6 @@ class RandomSample:
 
     def buffer_road(self):
         import ogr
-
         b_dist = self.buffer_dist
         road_ds = ogr.Open(self.roads, 0)
         drv = road_ds.GetDriver()
@@ -136,6 +135,7 @@ class RandomSample:
     def get_samples(self):
         """Generates a random sample of coordinates within the desired map classes.
         Returns list type with tuple elements of pixel coordinates."""
+        print '\ncollecting random coordinates...'
         ignore_pixel = self.ignore_pix
         self.data = self.band.ReadAsArray(0, 0, self.cols, self.rows)
         mask = np.in1d(self.data, ignore_pixel).reshape(self.data.shape)  # returns boolean of ignored values
@@ -152,6 +152,7 @@ class RandomSample:
         """Converts the sample of geographic coordinates to utm projected map coordinates.
         Returns dict type with tuple elements of geographic and projected coordinates
         with pixel values"""
+        print '\nconverting pixel coordinates and collecting pixel values...'
         coord_samples = self.rand_coord
         topleft_x = self.geotrans[0]
         topleft_y = self.geotrans[3]
@@ -189,7 +190,7 @@ class RandomSample:
         """Saves samples to a csv file."""
         import csv
         new_name = self.new_csv()
-
+        print '\nsaving samples to csv...'
         with open(new_name, 'wb') as csvfile:
             sample_writer = csv.writer(csvfile, delimiter=',')
             sample_writer.writerow(['id', 'geog_x', 'geog_y',
@@ -213,13 +214,15 @@ class RandomSample:
 
 class StratSample(RandomSample):
 
-    def __init__(self, f, i_pix=[0, 15], prop=5):
-        RandomSample.__init__(self, f, i_pix)
+    def __init__(self, f, s_size=500, i_pix=[1,15], r_path=None, buff_dist=30, prop=5):
+        RandomSample.__init__(self, f, s_size, i_pix, r_path, buff_dist)
 
         if prop <= 100:
             pass
         else:
             raise ValueError, "proportion must be <= 100"
+
+        self.class_proportion = prop
 
     def get_samples(self):
         """Collect random coordinates within classes according to user-specified
@@ -232,6 +235,7 @@ class StratSample(RandomSample):
         class_prop = {}
         self.rand_coord = {}
 
+        print "\ncollecting random stratified samples..."
         # iterate each class value to perform stratified sampling
         for pix_val in range(int(band_min), int(band_max)):
             if pix_val in self.ignore_pix:
@@ -263,7 +267,7 @@ class StratSample(RandomSample):
 
         wgs84 = Proj(proj='latlong', ellps='WGS84')
         utm51n = Proj(proj='utm', zone=51, ellps='WGS84')
-
+        print "\nconverting pixel coordinates and collecting pixel values..."
         for strata in self.rand_coord:
             for coord in self.rand_coord[strata]:
                 x_coord = topleft_x + coord[1] * pix_width
@@ -288,6 +292,7 @@ class StratSample(RandomSample):
         """Saves samples to a csv file."""
         import csv
         new_name = self.new_csv()
+        print "\nsaving samples to csv..."
         with open(new_name, 'wb') as f:
             sample_writer = csv.writer(f, delimiter=',')
             sample_writer.writerow(['id', 'geog_x', 'geog_y',
@@ -310,19 +315,15 @@ def main():
 
     test_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\test_lc"
     buffered_lc = "C:\Users\G Torres\Desktop\GmE205FinalProject\\clip_test_lc.TIFF"
-    road = "C:\Users\G Torres\Desktop\GmE205FinalProject\\bulacan_road.shp"
-    road_buffer = "C:\Users\G Torres\Desktop\GmE205FinalProject\GmE205FinalProject"
+    road = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\bulacan_roads.shp"
+    road_buffer = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject"
 
-    #random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
-    #strat_sample = StratSample(test_lc, i_pix=[0,15], prop=1)
+    random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
+    strat_sample = StratSample(test_lc, r_path=road, buff_dist=50, prop=1)
 
-    #print random_sample
-    #random_sample.buffer_road()
-    #random_sample.clip_dataset(test_lc, road_buffer)
-    bstrat_sample = StratSample(buffered_lc, prop=10)
-    bstrat_sample.get_samples()
-    bstrat_sample.pix_to_map()
-    bstrat_sample.save_to_csv()
+    strat_sample.get_samples()
+    strat_sample.pix_to_map()
+    strat_sample.save_to_csv()
 
 
 if __name__ == "__main__":
