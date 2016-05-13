@@ -7,11 +7,12 @@ import numpy.ma as ma
 import random
 import os
 import sys
+from subprocess import call
 
 
 class RandomSample:
 
-    def __init__(self, f, s_size=500, i_pix=[0, 15]):
+    def __init__(self, f, s_size=500, i_pix=[0, 15], r_path=None, buff_dist=30):
 
         if os.path.exists(f) is False:
             raise ValueError, "file does not exist"
@@ -29,6 +30,8 @@ class RandomSample:
 
         self.file_name = f
         self.sample_size = s_size
+        self.roads = r_path
+        self.buffer_dist = buff_dist
         self.ignore_pix = i_pix
 
     def img_check(self):
@@ -49,6 +52,73 @@ class RandomSample:
         #pal_name = gdal.GetPaletteInterpretationName(color_int)
         #color_tab = self.band.GetColorTable()
         return '\nclassification image has %d classes with a total of %d pixels' % (num_cat, sampling_pixels)
+
+    def buffer_road(self):
+        import ogr
+        b_dist = self.buffer_dist
+        road_ds = ogr.Open(self.roads, 0)
+        drv = road_ds.GetDriver()
+        road_lyr = road_ds.GetLayer(0)
+        road_sr = road_lyr.GetSpatialRef()
+
+        # create new vector data-set
+        buff_ds = drv.CreateDataSource('road_buffer.shp')
+        buff_lyr = buff_ds.CreateLayer('buffer', geom_type=ogr.wkbMultiPolygon)
+
+        if os.path.exists('road_buffer.shp'):
+            drv.DeleteDataSource('road_buffer.shp')
+
+        # create .prj file for buffer data-set
+        with open('road_buffer.prj', 'w') as f:
+            f.write(road_sr.ExportToWkt())
+
+        # geometry checker
+        road_chk = road_lyr.GetFeature(0)
+        geom_chk = road_chk.GetGeometryRef()
+        type_chk = geom_chk.GetGeometryName()
+        if 'LINESTRING' in type_chk:
+            pass
+        elif 'MULTILINESTRING' in type_chk:
+            pass
+        else:
+            print '\nshapefile geometry is neither LINESTRING or MULTILINESTRING! aborting operation...'
+            sys.exit(1)
+
+        # use geometry checker field definitions
+        field_defn = road_chk.GetFieldDefnRef(0)
+        buff_lyr.CreateField(field_defn)
+        buff_defn = buff_lyr.GetLayerDefn()
+
+        # loop through all features and buffer
+        road_count = road_lyr.GetFeatureCount()
+        print '\nthere are %d features in the shp file' % road_count
+        print '\nbuffering...'
+        for i in range(road_count):
+            road = road_lyr.GetFeature(i)
+            road_geom = road.GetGeometryRef()
+            buff_feat = ogr.Feature(buff_defn)
+            buff_feat.SetGeometry(road_geom.Buffer(b_dist))
+            buff_feat.SetField('osm_id', road.GetField('osm_id'))
+            buff_lyr.CreateFeature(buff_feat)
+
+            road.Destroy()
+            buff_feat.Destroy()
+        print'\ndone buffering, destroying features and datasets...'
+        road_ds.Destroy()
+        buff_ds.Destroy()
+
+        return
+
+    def clip_dataset(self, fn, shp):
+        path, name = os.path.split(fn)
+        print '\nclipping ' + name
+        clipped = path + '\clip_' + name.split('.')[0] + '.TIFF'
+        clip_cmd = ['gdalwarp', '-srcnodata', '-99', '-cutline', shp,
+                    '-crop_to_cutline', '-setci', '-overwrite', '-multi',
+                    fn, clipped]
+        call(clip_cmd)
+
+        return
 
     def img_parameters(self, f):
         """Load image as GDAL object and retrieve image parameters.
@@ -146,8 +216,8 @@ class RandomSample:
 
 class StratSample(RandomSample):
 
-    def __init__(self, f, s_size=None, i_pix=[0, 15], prop=5):
-        RandomSample.__init__(self, f, s_size, i_pix)
+    def __init__(self, f, s_size=None, i_pix=[1,15], r_path=None, buff_dist=30, prop=5):
+        RandomSample.__init__(self, f, s_size, i_pix, r_path, buff_dist)
 
         if prop <= 100:
             pass
@@ -160,10 +230,10 @@ class StratSample(RandomSample):
         """Collect random coordinates within classes according to user-specified
         proportion."""
         band_hist = self.band.GetHistogram()
-        stat = self.band.GetStatistics(0, 1)
         band_max = self.band.GetMaximum()
         band_min = self.band.GetMinimum()
-        print band_max
+        #stat = self.band.GetStatistics(0, 0)
+
         perc_prop = {}
         abs_prop = self.sample_size
         self.rand_coord = {}
@@ -255,17 +325,23 @@ class StratSample(RandomSample):
 def main():
 
     test_lc = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject\\test_lc"
+    buffered_lc = "clip_test_lc.TIFF"
+    road = "bulacan_roads.shp"
+    road_buffer = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject"
 
-    random_sample = RandomSample(test_lc)
-    strat_sample = StratSample(test_lc, i_pix=[0, 15], prop=10)
+    random_sample = RandomSample(test_lc, r_path=road, buff_dist=50)
+    strat_sample = StratSample(test_lc, i_pix=[0,2,3,15], r_path=road, buff_dist=50, prop=10)
 
-    random_sample.get_samples()
-    random_sample.pix_to_map()
-    #random_sample.save_to_csv()
-
-    strat_sample.get_samples()
-    strat_sample.pix_to_map()
+    strat_sample.buffer_road()
+    strat_sample.clip_dataset(test_lc, road_buffer)
+    #clip_strat_sample = StratSample(buffered_lc, prop=20)
+    #clip_strat_sample.get_samples()
+    #clip_strat_sample.pix_to_map()
     #strat_sample.save_to_csv()
+
+    #random_sample.get_samples()
+    #random_sample.pix_to_map()
+    #random_sample.save_to_csv()
 
 if __name__ == "__main__":
     main()
