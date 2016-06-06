@@ -7,6 +7,90 @@ import numpy.ma as ma
 import random
 import os
 import sys
+import time as tm
+from subprocess import call
+
+
+def buffer_road(road_shp, buffer_dist):
+    import ogr
+    b_dist = buffer_dist
+    road_ds = ogr.Open(road_shp, 0)
+    drv = road_ds.GetDriver()
+    road_lyr = road_ds.GetLayer(0)
+    road_sr = road_lyr.GetSpatialRef()
+
+    # create new vector data-set
+    buff_ds = drv.CreateDataSource('road_buffer.shp')
+    buff_lyr = buff_ds.CreateLayer('buffer', geom_type=ogr.wkbMultiPolygon)
+
+    if os.path.exists('road_buffer.shp'):
+        drv.DeleteDataSource('road_buffer.shp')
+
+    # create .prj file for buffer data-set
+    with open('road_buffer.prj', 'w') as f:
+        f.write(road_sr.ExportToWkt())
+
+    # geometry checker
+    road_chk = road_lyr.GetFeature(0)
+    geom_chk = road_chk.GetGeometryRef()
+    type_chk = geom_chk.GetGeometryName()
+    if 'LINESTRING' in type_chk:
+        pass
+    elif 'MULTILINESTRING' in type_chk:
+        pass
+    else:
+        print '\nshapefile geometry is neither LINESTRING or MULTILINESTRING! aborting operation...'
+        sys.exit(1)
+
+    # use geometry checker field definitions
+    field_defn = road_chk.GetFieldDefnRef(0)
+    buff_lyr.CreateField(field_defn)
+    buff_defn = buff_lyr.GetLayerDefn()
+
+    # loop through all features and buffer
+    road_count = road_lyr.GetFeatureCount()
+    print '\nthere are %d features in the shp file' % road_count
+    print '\nbuffering...'
+    for i in range(road_count):
+        road = road_lyr.GetFeature(i)
+        road_geom = road.GetGeometryRef()
+        buff_feat = ogr.Feature(buff_defn)
+        buff_feat.SetGeometry(road_geom.Buffer(b_dist))
+        buff_feat.SetField('osm_id', road.GetField('osm_id'))
+        buff_lyr.CreateFeature(buff_feat)
+
+        road.Destroy()
+        buff_feat.Destroy()
+    print'\ndone buffering, destroying features and datasets...'
+    road_ds.Destroy()
+    buff_ds.Destroy()
+
+    return
+
+
+def clip_dataset(fn, shp):
+    path, name = os.path.split(fn)
+    print '\nclipping ' + name
+    clipped = path + '\clip_' + name.split('.')[0] + '.TIFF'
+    clip_cmd = ['gdalwarp', '-srcnodata', '-99', '-cutline', shp,
+                '-crop_to_cutline', '-setci', '-overwrite', '-multi',
+                fn, clipped]
+    call(clip_cmd)
+
+    return
+
+
+def copy_categories(r1, r2):
+    raster1 = gdal.Open(r1, GA_ReadOnly)
+    band1 = raster1.GetRasterBand(1)
+    class_cat = band1.GetCategoryNames()
+
+    print '\ncopying category names from %s to %s' % (r1, r2)
+    raster2 = gdal.Open(r2, GA_ReadOnly)
+    band1 = raster2.GetRasterBand(1)
+    band1.SetCategoryNames(class_cat)
+
+    return
 
 
 class RandomSample:
@@ -32,7 +116,8 @@ class RandomSample:
         self.ignore_pix = i_pix
 
     def img_check(self):
-        """Checks if raster image is land classification image"""
+        """Checks if raster image is land classification image.
+        Returns boolean"""
         if self.band.GetCategoryNames() is None:
             return False
         else:
@@ -54,6 +139,7 @@ class RandomSample:
         """Load image as GDAL object and retrieve image parameters.
         Returns gdal image object and parameters"""
         gdal.AllRegister()
+        print '\nloading image parameters...'
         self.raster = gdal.Open(f, GA_ReadOnly)
         self.cols = self.raster.RasterXSize
         self.rows = self.raster.RasterYSize
@@ -160,10 +246,9 @@ class StratSample(RandomSample):
         """Collect random coordinates within classes according to user-specified
         proportion."""
         band_hist = self.band.GetHistogram()
-        stat = self.band.GetStatistics(0, 1)
+        self.band.GetStatistics(0, 1)
         band_max = self.band.GetMaximum()
         band_min = self.band.GetMinimum()
-        print band_max
         perc_prop = {}
         abs_prop = self.sample_size
         self.rand_coord = {}
@@ -172,6 +257,8 @@ class StratSample(RandomSample):
         # iterate each class value to perform stratified sampling
         for pix_val in range(int(band_min), int(band_max)):
             if pix_val in self.ignore_pix:
+                pass
+            elif band_hist[pix_val] == 0:
                 pass
             else:
                 # sample according to absolute or percentage proportion
@@ -253,19 +340,56 @@ class StratSample(RandomSample):
 
 
 def main():
-
+    start = tm.time()
     test_lc = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject\\test_lc"
+    non_lc = "C:\\Users\\G Torres\\Desktop\\GmE205FinalProject\\GmE205FinalProject\\432.tif"
+    roads = 'primary_secondary.shp'
 
-    random_sample = RandomSample(test_lc)
-    strat_sample = StratSample(test_lc, i_pix=[0, 15], prop=10)
+    # clip roads and copy category names
+    buffer_road(roads, 50)
 
-    random_sample.get_samples()
-    random_sample.pix_to_map()
-    #random_sample.save_to_csv()
+    for root, dirs, files in os.walk(os.getcwd()):
+        #print files
+        for f in files:
+            if 'buffer.shp' in f:
+                #print f
+                clip_dataset(test_lc, f)
+                pass
 
-    strat_sample.get_samples()
-    strat_sample.pix_to_map()
-    #strat_sample.save_to_csv()
+    for root, dirs, files in os.walk(os.getcwd()):
+        #print files
+        for f in files:
+            if 'xml' in f:
+                pass
+            elif '.csv' in f:
+                pass
+            elif 'clip' in f:
+                copy_categories(test_lc, f)
+
+    for root, dirs, files in os.walk(os.getcwd()):
+        #print files
+        for f in files:
+            if 'xml' in f:
+                pass
+            elif '.csv' in f:
+                pass
+            elif 'clip' in f:
+                # test random sampling scheme
+                random_sample = RandomSample(f)
+                random_sample.get_samples()
+                random_sample.pix_to_map()
+                random_sample.save_to_csv()
+
+                # test stratified sampling scheme
+                strat_sample = StratSample(f, i_pix=[0, 15], s_size=2)
+                strat_sample.get_samples()
+                strat_sample.pix_to_map()
+                strat_sample.save_to_csv()
+
+    # test if non-land-cover classification image can be loaded
+    non_lc_sample = RandomSample(non_lc)
+
+    print '\nScript run-time took %f seconds' % (tm.time() - start)
 
 if __name__ == "__main__":
     main()
