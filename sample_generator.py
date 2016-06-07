@@ -381,15 +381,16 @@ def main():
                 random_sample.save_to_csv()
 
                 # test stratified sampling scheme
-                strat_sample = StratSample(f, i_pix=[0, 15], s_size=2)
+                strat_sample = StratSample(f, i_pix=[0, 15], prop=50)
                 strat_sample.get_samples()
                 strat_sample.pix_to_map()
                 strat_sample.save_to_csv()
 
+    print '\nScript run-time took %f seconds' % (tm.time() - start)
+    print '\nTesting image checker on non-classification image...'
+
     # test if non-land-cover classification image can be loaded
     non_lc_sample = RandomSample(non_lc)
-
-    print '\nScript run-time took %f seconds' % (tm.time() - start)
 
 if __name__ == "__main__":
     main()
