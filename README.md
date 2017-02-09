@@ -1,5 +1,5 @@
 # Sample-Generator
-Implementation of sampling schemes for ground-truth points from land classification maps.
+Implementation of sampling schemes for ground-truth points from land classification maps. Final project for my GmE 205 class.
 
 OBJECTIVE: To derive thematic map ground-truth point samples from land cover maps using random & random stratified sampling
 
